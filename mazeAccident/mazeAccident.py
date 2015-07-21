@@ -635,6 +635,7 @@ for anyVeh in affectedVeh:
             optimal_grandTotal_est_B = new_grandTotal_est_B
             optimal_route_est_B = curNewRoute_B
             vehNums_B_tmp = copy.deepcopy(vehNums_copy)
+        
         #method A: we will not update the traffic info after we choose the optimal route for the first affected car
         curNewRoute_A, vehNums_copy_A, cur_Time_A = route_and_vehNums(everyRoute, 
                   vehNums_A, cur_x, cur_y, new_car_start_time, edgeLen)
@@ -667,23 +668,23 @@ for veh in unaffectedVeh:
 
 
 #from final routes to write the files smartly coordinated
-writeNewRouFile('newmaze.rou.xml', newRoutes_B)
+writeNewRouFile('newmazeB.rou.xml', newRoutes_B)
 ## call the command line to run sumo with newcar
-subprocess.call(['sumo64', '-a', 'maze.add.xml', '-c', 'newmaze.sumo.cfg'], shell=True)
+subprocess.call(['sumo64', '-a', 'maze.add.xml', '-c', 'newmazeB.sumo.cfg'], shell=True)
 
-timeSpent = totalTime('newmaze.output.xml')
+timeSpent_B = totalTime('newmazeB.output.xml')
 
-print("If accident and smartly coordinated, total time spent: ", timeSpent, '#########')
+print("If accident and smartly coordinated, total time spent: ", timeSpent_B, '#########')
 
 
 #from final routes to write the files, not smartly coordinated
-writeNewRouFile('newmaze.rou.xml', newRoutes_A)
+writeNewRouFile('newmazeA.rou.xml', newRoutes_A)
 ## call the command line to run sumo with newcar
-subprocess.call(['sumo64', '-a', 'maze.add.xml', '-c', 'newmaze.sumo.cfg'], shell=True)
+subprocess.call(['sumo64', '-a', 'maze.add.xml', '-c', 'newmazeA.sumo.cfg'], shell=True)
 
-timeSpent = totalTime('newmaze.output.xml')
+timeSpent_A = totalTime('newmazeA.output.xml')
 
-print("If accident and naively coordinated, total time spent: ", timeSpent, '#########')
+print("If accident and naively coordinated, total time spent: ", timeSpent_A, '#########')
 
 
 
