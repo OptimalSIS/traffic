@@ -20,8 +20,8 @@ n_route = 4   # number of different routes for each of the four start-to-end tri
 n_car = 10
 randSeed = 1
 crushTime = 100
-badRoad1 = "22to23"
-badRoad2 = "23to22"
+badRoad1 = "12to22"
+badRoad2 = "22to12"
 
 speed = 50         #speed of the cars
 acc = 3            #acceleration of the car
@@ -395,10 +395,10 @@ def run_new_simu(curNewRoute, new_car_start_time):
 
 ###given the new vehNums_copy, estimate all unaffected cars total time and the sum
 ###the total time is calculated from the time of the crush
-def estOtherTotal(unaffectedVeh, edgeLen, vehNums_copy, newTime, newRoutes):
+def estOtherTotal(theseVeh, edgeLen, vehNums_copy, newTime, newRoutes):
     timeEst = {}   
     new_total_est = 0
-    for everyV in unaffectedVeh:
+    for everyV in theseVeh:
         nowTime = newTime[everyV]
         nowRoute = newRoutes[everyV]
         routeList = nowRoute.split()
@@ -579,15 +579,21 @@ for ve in finishTime:
 print("If no accident: ", old_total_simu, '#########')
 
 
-vehNums_noUpdate = copy.deepcopy(vehNums)
-unaffectedVeh_to_update = copy.deepcopy(unaffectedVeh)
-newRoutes_noUpdate = copy.deepcopy(newRoutes)
-newRoutes_to_update = copy.deepcopy(newRoutes)
+
 ######################################################################
 #here we are going to recompute the routes for the affected cars one by one
-#compare two ways, one: after computing the new route for an affected car, we do not update the traffic info
-#the other way is to update the traffic info according to this new car's route
+#compare two ways, 
+##A: after computing the new route for an affected car, we do not update the traffic info
+##B: to update the traffic info according to this new car's route
 ######################################################################
+vehNums_A = copy.deepcopy(vehNums)
+newRoutes_A = copy.deepcopy(newRoutes)
+
+vehNums_B = copy.deepcopy(vehNums)
+newRoutes_B = copy.deepcopy(newRoutes)
+unaffectedVeh_B = copy.deepcopy(unaffectedVeh)
+
+
 
 for anyVeh in affectedVeh:
     curEdge = crushEdge[anyVeh]
@@ -606,67 +612,62 @@ for anyVeh in affectedVeh:
     #generate all binary sequence, each corresponds to route for the new car 
     route_sequence = allBinarySquence(abs(x_move), abs(y_move))
     #find the optimal route for this particular vehicle
-    optimal_grandTotal_est = 10**6
-    optimal_route_est = ""
-    optimal_grandTotal_est_noUpdate = 10**6
-    optimal_route_est_noUpdate = ""
-    #we will update the vehNums according to the optimal routes, now keep a copy
-    to_up_date_vehNums = {}
+    optimal_grandTotal_est_B = 10**6
+    optimal_route_est_B = ""
+    optimal_grandTotal_est_A = 10**6
+    optimal_route_est_A = ""
+    #in method B we will update the vehNums according to the optimal routes, now keep a copy
+    vehNums_B_tmp = {}
     #for this vehicle, choose the best route
     for everyRoute in route_sequence:
         cur_x = new_car_start_pos[0]
         cur_y = new_car_start_pos[1]
-        curNewRoute, vehNums_copy, cur_Time = route_and_vehNums(everyRoute, vehNums, cur_x, cur_y, new_car_start_time, edgeLen)
-        curNewRoute_noUpdate, vehNums_copy_noUpdate, cur_Time_noUpdate = route_and_vehNums(everyRoute, 
-                  vehNums_noUpdate, cur_x, cur_y, new_car_start_time, edgeLen)
-        #print("#####################################################################")
-        #print("Running for one route!!")
-        #print("#####################################################################")
-        #print("current route: ", curNewRoute)
-        if(badRoad1 in curNewRoute or badRoad2 in curNewRoute):
+        #method B: we will update the traffic info after we choose the optimal route for the first affected car
+        curNewRoute_B, vehNums_copy, cur_Time_B = route_and_vehNums(everyRoute, vehNums_B, cur_x, cur_y, new_car_start_time, edgeLen)
+        if(badRoad1 in curNewRoute_B or badRoad2 in curNewRoute_B):
             continue  
-        new_car_travel_time_est = cur_Time - new_car_start_time
-        new_car_travel_time_est_noUpdate = cur_Time_noUpdate - new_car_start_time
+        new_car_travel_time_est_B = cur_Time_B - new_car_start_time
         ##given the new vehNums, estimate all other cars total time
-        new_total_est = estOtherTotal(unaffectedVeh_to_update, edgeLen, vehNums_copy, newTime, newRoutes_to_update)
-        new_total_est_noUpdate = estOtherTotal(unaffectedVeh, edgeLen, vehNums_copy_noUpdate, newTime, newRoutes)
-        new_grandTotal_est = new_car_travel_time_est + new_total_est
-        new_grandTotal_est_noUpdate = new_car_travel_time_est_noUpdate + new_total_est_noUpdate
+        new_total_est_B = estOtherTotal(unaffectedVeh_B, edgeLen, vehNums_copy, newTime, newRoutes_B)
+        new_grandTotal_est_B = new_car_travel_time_est_B + new_total_est_B
         #update the optimal time if necessary (estimation)
-        if(optimal_grandTotal_est > new_grandTotal_est):
-            optimal_grandTotal_est = new_grandTotal_est
-            optimal_route_est = curNewRoute
-            to_up_date_vehNums = copy.deepcopy(vehNums_copy)
-        if(optimal_grandTotal_est_noUpdate > new_grandTotal_est_noUpdate):
-            optimal_grandTotal_est_noUpdate = new_grandTotal_est_noUpdate
-            optimal_route_est_noUpdate = curNewRoute_noUpdate
+        if(optimal_grandTotal_est_B > new_grandTotal_est_B):
+            optimal_grandTotal_est_B = new_grandTotal_est_B
+            optimal_route_est_B = curNewRoute_B
+            vehNums_B_tmp = copy.deepcopy(vehNums_copy)
+        #method A: we will not update the traffic info after we choose the optimal route for the first affected car
+        curNewRoute_A, vehNums_copy_A, cur_Time_A = route_and_vehNums(everyRoute, 
+                  vehNums_A, cur_x, cur_y, new_car_start_time, edgeLen)
+        new_car_travel_time_est_A = cur_Time_A - new_car_start_time
+        ##given the new vehNums, estimate all other cars total time
+        new_total_est_A = estOtherTotal(unaffectedVeh, edgeLen, vehNums_copy_A, newTime, newRoutes)
+        new_grandTotal_est_A = new_car_travel_time_est_A + new_total_est_A
+        #update the optimal time if necessary (estimation)
+        if(optimal_grandTotal_est_A > new_grandTotal_est_A):
+            optimal_grandTotal_est_A = new_grandTotal_est_A
+            optimal_route_est_A = curNewRoute_A
     #update the vehNums according to this optimal routes
-    vehNums = copy.deepcopy(to_up_date_vehNums)    
+    vehNums_B = copy.deepcopy(vehNums_B_tmp)    
     #add this route to the new route, which will be used for other affected cars
-    newRoutes_to_update[anyVeh] = optimal_route_est
-    newRoutes_noUpdate[anyVeh] = optimal_route_est_noUpdate
-    unaffectedVeh_to_update.append(anyVeh)
-    
-
-
-
-print("We have total cars:", len(unaffectedVeh_to_update))
-    
+    newRoutes_B[anyVeh] = optimal_route_est_B
+    newRoutes_A[anyVeh] = optimal_route_est_A
+    unaffectedVeh_B.append(anyVeh)
+        
 
 #update the final routes
 for veh in affectedVeh:
     oldRoute = vehRous[veh]
     firstPart = oldRoute.split(crushEdge[veh])[0]
-    newRoutes_to_update[veh] = firstPart + crushEdge[veh] + ' ' + newRoutes_to_update[veh]
-    newRoutes_noUpdate[veh] = firstPart + crushEdge[veh] + ' ' + newRoutes_noUpdate[veh]
+    newRoutes_B[veh] = firstPart + crushEdge[veh] + ' ' + newRoutes_B[veh]
+    newRoutes_A[veh] = firstPart + crushEdge[veh] + ' ' + newRoutes_A[veh]
 
 for veh in unaffectedVeh:
-    newRoutes_to_update[veh] = vehRous[veh]
-    newRoutes_noUpdate[veh] = vehRous[veh]
+    newRoutes_B[veh] = vehRous[veh]
+    newRoutes_A[veh] = vehRous[veh]
 
 
 #from final routes to write the files smartly coordinated
-writeNewRouFile('newmaze.rou.xml', newRoutes_to_update)
+writeNewRouFile('newmaze.rou.xml', newRoutes_B)
 ## call the command line to run sumo with newcar
 subprocess.call(['sumo64', '-a', 'maze.add.xml', '-c', 'newmaze.sumo.cfg'], shell=True)
 
@@ -676,7 +677,7 @@ print("If accident and smartly coordinated, total time spent: ", timeSpent, '###
 
 
 #from final routes to write the files, not smartly coordinated
-writeNewRouFile('newmaze.rou.xml', newRoutes_noUpdate)
+writeNewRouFile('newmaze.rou.xml', newRoutes_A)
 ## call the command line to run sumo with newcar
 subprocess.call(['sumo64', '-a', 'maze.add.xml', '-c', 'newmaze.sumo.cfg'], shell=True)
 
