@@ -5,6 +5,7 @@ import itertools
 import math
 import time
 import copy
+import collections
 
 #load the dictionary for the cost function
 with open('costF.pickle', 'rb') as restoreData:
@@ -322,6 +323,7 @@ def readFile(filename, unaffectedVeh):
 
 ###generate the route file with the new car
 def writeNewRouFile(filename, newRoutes):
+    newRoutes_Ordered = collections.OrderedDict(sorted(newRoutes.items(), key = lambda t:t[0]))
     h = open(filename, 'w')
     h.write(h_start)
     h.write('\n')
@@ -331,8 +333,8 @@ def writeNewRouFile(filename, newRoutes):
     h.write(thisline)
     h.write('\n')
     addedRoute = []
-    for veh in newRoutes:
-        thisRoute = newRoutes[veh]
+    for veh in newRoutes_Ordered:
+        thisRoute = newRoutes_Ordered[veh]
         if(thisRoute not in addedRoute):
             thisline = '    <route id="' + thisRoute + '" edges="' + thisRoute + '"/>'  
             addedRoute.append(thisRoute)
@@ -528,7 +530,9 @@ writeEdgeFile('maze.edg.xml', grid)
 writeAddFile('maze.add.xml', grid)
 
 #writing the route file, vehRous returns the routes for all the cars
-vehRous = writeRouFile('maze.rou.xml')
+vehRous_raw = writeRouFile('maze.rou.xml')
+
+vehRous = collections.OrderedDict(sorted(vehRous_raw.items(), key = lambda t:t[0]))
 
 
 
@@ -584,7 +588,7 @@ newRoutes_to_update = copy.deepcopy(newRoutes)
 #compare two ways, one: after computing the new route for an affected car, we do not update the traffic info
 #the other way is to update the traffic info according to this new car's route
 ######################################################################
-f = open('test2.xml', 'w')
+
 for anyVeh in affectedVeh:
     curEdge = crushEdge[anyVeh]
     newStart = curEdge.split("to")[-1]
@@ -642,9 +646,9 @@ for anyVeh in affectedVeh:
     newRoutes_to_update[anyVeh] = optimal_route_est
     newRoutes_noUpdate[anyVeh] = optimal_route_est_noUpdate
     unaffectedVeh_to_update.append(anyVeh)
-    f.write(anyVeh + " has the optimal route " + optimal_route_est + '\n')
+    
 
-f.close()
+
 
 print("We have total cars:", len(unaffectedVeh_to_update))
     
@@ -660,7 +664,7 @@ for veh in unaffectedVeh:
     newRoutes_to_update[veh] = vehRous[veh]
     newRoutes_noUpdate[veh] = vehRous[veh]
 
- 
+
 #from final routes to write the files smartly coordinated
 writeNewRouFile('newmaze.rou.xml', newRoutes_to_update)
 ## call the command line to run sumo with newcar
