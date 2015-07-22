@@ -1,3 +1,4 @@
+##use random seed to make everything reproducible 
 import random
 import subprocess, os
 import pickle
@@ -15,8 +16,9 @@ with open('costF.pickle', 'rb') as restoreData:
 grid = 4   # we are going to create a grid by grid square
 gridsize = 10**2
 n_route = 4   # number of different routes for each of the four start-to-end trips, each route can have multiple cars
-n_car = 15
-randSeed = 1
+n_car = 15    # number of cars for each route
+randSeed = 1  # random seed 
+
 
 
 speed = 50         #speed of the cars
@@ -564,34 +566,7 @@ print("Optimal route chosen by estimation: ", optimal_route_est)
 #Here, we are comparing the real sum of the finish times with the 
 #predicted sum of the finish times
 ######################################################################
-'''
-timeEst = {}
-totalSimu = 0
-totalEst = 0
-for everyV in startTime:
-    nowTime = startTime[everyV]
-    nowRoute = vehRous[everyV]
-    routeList = nowRoute.split()
-    for edge in routeList:
-        nowOffset = nowTime%94
-        nowDist = edgeLen[edge]
-        locations = edge.split("to")
-        trafficLight = locations[1]
-        nowKey = (nowTime, edge)
-        if(nowKey in vehNums):
-            nowNum = vehNums[nowKey]
-        else:
-            nowNum = 0
-        nowNum = min(nowNum, int(nowDist/100*max_Car))
-        timeCost = costF[str((nowDist, nowOffset, nowNum))]
-        nowTime += timeCost
-    timeEst[everyV] = nowTime
-    #print(timeEst[everyV], finishTime[everyV])
-    totalSimu += finishTime[everyV]
-    totalEst += timeEst[everyV]
 
-print(totalSimu, totalEst)     
-'''    
 
     
     
