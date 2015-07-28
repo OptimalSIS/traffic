@@ -1,3 +1,5 @@
+#in this method, we first compute the optimal route for each affected vehicle in a distributed fashion
+#then we recompute the optimal route for each affected car one by one centralizedly
 import random
 import subprocess, os
 import pickle
@@ -349,9 +351,11 @@ def writeNewRouFile(filename, newRoutes):
 
 ###for any binary sequence, generate the corresponding route, update the vehNums along the route
 ###return the new route, a copy of the updated vehNums
+###also return a copy of the change of the traffic, which is a map: time to edge
 def route_and_vehNums(route_binary, vehNums, cur_x, cur_y, cur_Time, edgeLen): 
     curNewRoute = ""
     vehNums_copy = {}
+    veh_change = {}
     for elem in route_binary:
         if(elem == '0'):
             next_x = cur_x + x_step
@@ -375,13 +379,14 @@ def route_and_vehNums(route_binary, vehNums, cur_x, cur_y, cur_Time, edgeLen):
         cur_y = next_y
         for timeSlot in range(0, timeSpent):
             modifyTime = cur_Time + timeSlot
+            veh_change[modifyTime] = curEdge
             modifyKey = (modifyTime, curEdge)
             if(modifyKey in vehNums_copy):
                 vehNums_copy[modifyKey] += 1
             else:
                 vehNums_copy[modifyKey] = 1  
         cur_Time += timeSpent  
-    return curNewRoute[:-1], vehNums_copy, cur_Time
+    return curNewRoute[:-1], vehNums_copy, cur_Time, veh_change
 
 
 ###generate the new route file with the new car and run the simulation with the new car
@@ -581,19 +586,13 @@ print("If no accident: ", old_total_simu, '#########')
 
 
 ######################################################################
-#here we are going to recompute the routes for the affected cars one by one
-#compare two ways, 
+#here we are going to recompute the routes for the affected cars one by one 
 ##A: after computing the new route for an affected car, we do not update the traffic info
-##B: to update the traffic info according to this new car's route
+##This is the computation done distributively
 ######################################################################
 vehNums_A = copy.deepcopy(vehNums)
 newRoutes_A = copy.deepcopy(newRoutes)
-
-vehNums_B = copy.deepcopy(vehNums)
-newRoutes_B = copy.deepcopy(newRoutes)
-unaffectedVeh_B = copy.deepcopy(unaffectedVeh)
-
-
+vehNums_change_A = {}
 
 for anyVeh in affectedVeh:
     curEdge = crushEdge[anyVeh]
@@ -612,18 +611,84 @@ for anyVeh in affectedVeh:
     #generate all binary sequence, each corresponds to route for the new car 
     route_sequence = allBinarySquence(abs(x_move), abs(y_move))
     #find the optimal route for this particular vehicle
-    optimal_grandTotal_est_B = 10**6
-    optimal_route_est_B = ""
     optimal_grandTotal_est_A = 10**6
     optimal_route_est_A = ""
-    #in method B we will update the vehNums according to the optimal routes, now keep a copy
-    vehNums_B_tmp = {}
+    optimal_veh_change_A = {}
     #for this vehicle, choose the best route
     for everyRoute in route_sequence:
         cur_x = new_car_start_pos[0]
         cur_y = new_car_start_pos[1]
-        #method B: we will update the traffic info after we choose the optimal route for the first affected car
-        curNewRoute_B, vehNums_copy, cur_Time_B = route_and_vehNums(everyRoute, vehNums_B, cur_x, cur_y, new_car_start_time, edgeLen)
+        #method A: we will not update the traffic info after we choose the optimal route for the first affected car
+        curNewRoute_A, vehNums_copy_A, cur_Time_A, veh_change_A = route_and_vehNums(everyRoute, 
+                  vehNums_A, cur_x, cur_y, new_car_start_time, edgeLen)
+        if(badRoad1 in curNewRoute_A or badRoad2 in curNewRoute_A):
+            continue         
+        new_car_travel_time_est_A = cur_Time_A - new_car_start_time
+        ##given the new vehNums, estimate all other cars total time
+        new_total_est_A = estOtherTotal(unaffectedVeh, edgeLen, vehNums_copy_A, newTime, newRoutes)
+        new_grandTotal_est_A = new_car_travel_time_est_A + new_total_est_A
+        #update the optimal time if necessary (estimation)
+        if(optimal_grandTotal_est_A > new_grandTotal_est_A):
+            optimal_grandTotal_est_A = new_grandTotal_est_A
+            optimal_route_est_A = curNewRoute_A
+            optimal_veh_change_A = copy.deepcopy(veh_change_A) 
+    #add this route to the new route
+    newRoutes_A[anyVeh] = optimal_route_est_A
+    vehNums_change_A[anyVeh] = optimal_veh_change_A
+  
+
+##after comupting the routes for the affected vehs distributively, we will once again 
+##update the routes for the affected vehs in a centralized way.
+##here after update each affected veh, we will use this data to update later affected vehs  
+
+
+vehNums_B = copy.deepcopy(vehNums)
+newRoutes_B = copy.deepcopy(newRoutes)
+unaffectedVeh_B = copy.deepcopy(unaffectedVeh)
+
+for anyVeh in affectedVeh:
+    #update the vehNum info according to all other affected cars
+    vehNums_B_cur = copy.deepcopy(vehNums_B)
+    for Veh in vehNums_change_A:
+        if(veh == anyVeh):
+            continue
+        update_map = vehNums_change_A[Veh]
+        for update_time in update_map:
+            update_edge = update_map[update_time]
+            updateKey = (update_time, update_edge)
+            if(updateKey in vehNums_B_cur):
+                vehNums_B_cur[updateKey] += 1
+            else:
+                vehNums_B_cur[updateKey] = 1
+    #delete the current vehicle from the vehNum update list
+    del vehNums_change_A[anyVeh]          
+    curEdge = crushEdge[anyVeh]
+    newStart = curEdge.split("to")[-1]
+    new_car_start_pos = [int(newStart[0]), int(newStart[1])]
+    newEnd = vehRous[anyVeh].split()[-1].split("to")[-1]
+    new_car_end_pos = [int(newEnd[0]), int(newEnd[1])]
+    new_car_start_time = newTime[anyVeh]
+    x_move = int(newEnd[0]) - int(newStart[0])
+    y_move = int(newEnd[1]) - int(newStart[1])
+    x_step = int(abs(x_move)/x_move)
+    y_step = int(abs(y_move)/y_move)
+    #print("New car starts at time: ", new_car_start_time)
+    #print("New car start location: ", new_car_start_pos)
+    #print("New car end location: ", new_car_end_pos)
+    #generate all binary sequence, each corresponds to route for the new car 
+    route_sequence = allBinarySquence(abs(x_move), abs(y_move))
+    #find the optimal route for this particular vehicle
+    optimal_grandTotal_est_B = 10**6
+    optimal_route_est_B = ""
+    #we will update the vehNums according to the optimal routes, now keep a copy
+    vehNums_B_tmp = {}      
+    #for this vehicle, choose the best route
+    for everyRoute in route_sequence:
+        cur_x = new_car_start_pos[0]
+        cur_y = new_car_start_pos[1]
+        #we will update the traffic info after we choose the optimal route for the first affected car
+        curNewRoute_B, vehNums_copy, cur_Time_B, veh_change_B = route_and_vehNums(everyRoute, 
+                          vehNums_B_cur, cur_x, cur_y, new_car_start_time, edgeLen)
         if(badRoad1 in curNewRoute_B or badRoad2 in curNewRoute_B):
             continue  
         new_car_travel_time_est_B = cur_Time_B - new_car_start_time
@@ -635,46 +700,22 @@ for anyVeh in affectedVeh:
             optimal_grandTotal_est_B = new_grandTotal_est_B
             optimal_route_est_B = curNewRoute_B
             vehNums_B_tmp = copy.deepcopy(vehNums_copy)
-        
-        #method A: we will not update the traffic info after we choose the optimal route for the first affected car
-        curNewRoute_A, vehNums_copy_A, cur_Time_A = route_and_vehNums(everyRoute, 
-                  vehNums_A, cur_x, cur_y, new_car_start_time, edgeLen)
-        new_car_travel_time_est_A = cur_Time_A - new_car_start_time
-        ##given the new vehNums, estimate all other cars total time
-        new_total_est_A = estOtherTotal(unaffectedVeh, edgeLen, vehNums_copy_A, newTime, newRoutes)
-        new_grandTotal_est_A = new_car_travel_time_est_A + new_total_est_A
-        #update the optimal time if necessary (estimation)
-        if(optimal_grandTotal_est_A > new_grandTotal_est_A):
-            optimal_grandTotal_est_A = new_grandTotal_est_A
-            optimal_route_est_A = curNewRoute_A
     #update the vehNums according to this optimal routes
     vehNums_B = copy.deepcopy(vehNums_B_tmp)    
     #add this route to the new route, which will be used for other affected cars
     newRoutes_B[anyVeh] = optimal_route_est_B
-    newRoutes_A[anyVeh] = optimal_route_est_A
     unaffectedVeh_B.append(anyVeh)
-        
+
+
 
 #update the final routes
 for veh in affectedVeh:
     oldRoute = vehRous[veh]
     firstPart = oldRoute.split(crushEdge[veh])[0]
-    newRoutes_B[veh] = firstPart + crushEdge[veh] + ' ' + newRoutes_B[veh]
     newRoutes_A[veh] = firstPart + crushEdge[veh] + ' ' + newRoutes_A[veh]
 
 for veh in unaffectedVeh:
-    newRoutes_B[veh] = vehRous[veh]
     newRoutes_A[veh] = vehRous[veh]
-
-
-#from final routes to write the files smartly coordinated
-writeNewRouFile('newmazeB.rou.xml', newRoutes_B)
-## call the command line to run sumo with newcar
-subprocess.call(['sumo64', '-a', 'maze.add.xml', '-c', 'newmazeB.sumo.cfg'], shell=True)
-
-timeSpent_B = totalTime('newmazeB.output.xml')
-
-print("If accident and smartly coordinated, total time spent: ", timeSpent_B, '#########')
 
 
 #from final routes to write the files, not smartly coordinated
