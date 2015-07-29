@@ -16,14 +16,14 @@ with open('costF.pickle', 'rb') as restoreData:
 ######################################################################
 #parameters
 ######################################################################
-grid = 4   # we are going to create a grid by grid square
+grid = 5   # we are going to create a grid by grid square
 gridsize = 10**2
-n_route = 4   # number of different routes for each of the four start-to-end trips, each route can have multiple cars
-n_car = 10
+n_route = 5   # number of different routes for each of the four start-to-end trips, each route can have multiple cars
+n_car = 15
 randSeed = 1
-crushTime = 100
-badRoad1 = "11to12"
-badRoad2 = "12to11"
+crushTime = 130
+badRoad1 = "24to34"
+badRoad2 = "34to24"
 
 speed = 50         #speed of the cars
 acc = 3            #acceleration of the car
@@ -373,7 +373,7 @@ def route_and_vehNums(route_binary, vehNums, cur_x, cur_y, cur_Time, edgeLen):
         else:
             curNum = 0
         if(curNum > curDist * max_Car/100):
-            curNum = curDist * max_Car/100
+            curNum = int(curDist * max_Car/100)
         timeSpent = costF[str((curDist, curOffset, curNum))]
         cur_x = next_x
         cur_y = next_y
@@ -637,10 +637,33 @@ for anyVeh in affectedVeh:
     vehNums_change_A[anyVeh] = optimal_veh_change_A
   
 
+
+#update the routes after the distributive computation
+for veh in affectedVeh:
+    oldRoute = vehRous[veh]
+    firstPart = oldRoute.split(crushEdge[veh])[0]
+    newRoutes_A[veh] = firstPart + crushEdge[veh] + ' ' + newRoutes_A[veh]
+
+for veh in unaffectedVeh:
+    newRoutes_A[veh] = vehRous[veh]
+
+
+#from final routes to write the files, not smartly coordinated
+writeNewRouFile('newmazeA.rou.xml', newRoutes_A)
+## call the command line to run sumo with newcar
+subprocess.call(['sumo64', '-a', 'maze.add.xml', '-c', 'newmazeA.sumo.cfg'], shell=True)
+
+timeSpent_A = totalTime('newmazeA.output.xml')
+
+print("If accident and rerouted distributively, total time spent: ", timeSpent_A, '#########')
+
+
+
 ##after comupting the routes for the affected vehs distributively, we will once again 
 ##update the routes for the affected vehs in a centralized way.
 ##here after update each affected veh, we will use this data to update later affected vehs  
-
+#here we do not need the newRoutes_A since we only need the difference of the traffic information
+#which is stored in vehNums_change_A
 
 vehNums_B = copy.deepcopy(vehNums)
 newRoutes_B = copy.deepcopy(newRoutes)
@@ -708,24 +731,21 @@ for anyVeh in affectedVeh:
 
 
 
-#update the final routes
 for veh in affectedVeh:
     oldRoute = vehRous[veh]
     firstPart = oldRoute.split(crushEdge[veh])[0]
-    newRoutes_A[veh] = firstPart + crushEdge[veh] + ' ' + newRoutes_A[veh]
+    newRoutes_B[veh] = firstPart + crushEdge[veh] + ' ' + newRoutes_B[veh]
+   
 
 for veh in unaffectedVeh:
-    newRoutes_A[veh] = vehRous[veh]
+    newRoutes_B[veh] = vehRous[veh]
 
 
-#from final routes to write the files, not smartly coordinated
-writeNewRouFile('newmazeA.rou.xml', newRoutes_A)
+#from final routes to write the files smartly coordinated
+writeNewRouFile('newmazeB.rou.xml', newRoutes_B)
 ## call the command line to run sumo with newcar
-subprocess.call(['sumo64', '-a', 'maze.add.xml', '-c', 'newmazeA.sumo.cfg'], shell=True)
+subprocess.call(['sumo64', '-a', 'maze.add.xml', '-c', 'newmazeB.sumo.cfg'], shell=True)
 
-timeSpent_A = totalTime('newmazeA.output.xml')
+timeSpent_B = totalTime('newmazeB.output.xml')
 
-print("If accident and naively coordinated, total time spent: ", timeSpent_A, '#########')
-
-
-
+print("If accident and rerouted distributively then centralizedly for the affected vehicles, total time spent: ", timeSpent_B, '#########')
