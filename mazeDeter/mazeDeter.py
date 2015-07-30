@@ -5,6 +5,8 @@ import pickle
 import itertools
 import math
 import time
+import copy
+import collections
 
 #load the dictionary for the cost function
 with open('costF.pickle', 'rb') as restoreData:
@@ -322,7 +324,7 @@ def writeNewRouFile(newfilename, oldfilename, newRoute, departTime):
 ###return the new route, a copy of the updated vehNums
 def route_and_vehNums(route_binary, vehNums, cur_x, cur_y, cur_Time, edgeLen): 
     curNewRoute = ""
-    vehNums_copy = {}
+    vehNums_copy = copy.deepcopy(vehNums)
     for elem in route_binary:
         if(elem == '0'):
             next_x = cur_x + x_step
