@@ -740,7 +740,12 @@ unaffectedVeh_B = copy.deepcopy(unaffectedVeh)
 
 centralized_all(newRoutes_B, unaffectedVeh_B, affectedVeh, vehNums_change_A, vehNums_B)
 
+###### make a copy of the new routes for the future use, this part of the route is after the crush
+##first copy the routes from newRoutes_B, here the affected cars have new routes, we will fix these in the following
+newRoutes_C = copy.deepcopy(newRoutes_B)
+######################
 
+###add what happends before crush to have the full routes
 for veh in affectedVeh:
     oldRoute = vehRous[veh]
     firstPart = oldRoute.split(crushEdge[veh])[0]
@@ -761,8 +766,31 @@ timeSpent_B = totalTime('newmazeB.output.xml')
 print("If accident and rerouted distributively then centralizedly for the affected vehicles, total time spent: ", timeSpent_B, '#########')
 
 
-###here we are going to reroute the unaffected cars 
+###########here we are going to reroute the unaffected cars 
 
 
+affectedVeh_C = copy.deepcopy(affectedVeh)
+
+centralized_all(newRoutes_C, affectedVeh_C, unaffectedVeh, vehNums_change_unaffected, vehNums_B)
+
+
+
+for veh in affectedVeh:
+    newRoutes_C[veh] = newRoutes_B[veh]
+   
+
+for veh in unaffectedVeh:
+    oldRoute = vehRous[veh]
+    firstPart = oldRoute.split(crushEdge[veh])[0]
+    newRoutes_C[veh] = firstPart + crushEdge[veh] + ' ' + newRoutes_C[veh]
+
+#from final routes to write the files
+writeNewRouFile('newmazeC.rou.xml', newRoutes_C)
+## call the command line to run sumo with newcar
+subprocess.call(['sumo64', '-a', 'maze.add.xml', '-c', 'newmazeC.sumo.cfg'], shell=True)
+
+timeSpent_C = totalTime('newmazeC.output.xml')
+
+print("If accident and rerouted distributively then centralizedly for the affected vehicles and centralized for the unaffected vehicles, total time spent: ", timeSpent_C, '#########')
 
 
